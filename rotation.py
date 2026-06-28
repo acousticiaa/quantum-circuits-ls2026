@@ -25,18 +25,43 @@ class Bloch:
     alpha: float  # global phase
     n: np.ndarray  # unit rotation axis, shape (3,): [n_x, n_y, n_z]
     theta: float  # rotation angle
+    
 
 
 def to_bloch(g: np.ndarray) -> Bloch:
     """Recover the Bloch form (alpha, n, theta) of a 2x2 unitary `g`."""
-    raise NotImplementedError("to_bloch is not implemented yet")
-
-
+    # raise NotImplementedError("to_bloch is not implemented yet")
+    alpha = np.angle(np.linalg.det(g))/2
+    u = g*np.exp(-1j*alpha)
+    tr = np.real(np.trace(u))/2
+    tr = np.clip(tr,-1.0,1.0)
+    theta = 2*np.arccos(tr)
+    if np.isclose(theta, 0):
+        b = Bloch()
+        b.alpha = alpha
+        b.n = np.array([0.0, 0.0, 1.0])
+        b.theta = 0.0
+        return b
+    s = np.sin(theta/2)
+    nx = -np.imag(u[0, 1] + u[1, 0]) / (2 * s)
+    ny = np.real(u[1, 0] - u[0, 1]) / (2 * s)
+    nz = -np.imag(u[0, 0] - u[1, 1]) / (2 * s)
+    n = np.array([nx, ny, nz], dtype=float)
+    norm = np.linalg.norm(n)
+    if norm < 1e-12:
+        n = np.array([0.0, 0.0, 1.0])
+    else:
+        n/=norm
+    b = Bloch()
+    b.alpha = alpha
+    b.n = n
+    b.theta = theta
+    return b
 # n1, n2 are two orthogonal Bloch-sphere axes (n1 . n2 == 0)
 # TODO: fill in the two orthogonal rotation axes (each a length-3
 # unit vector [x, y, z])
-n1 = np.array([np.nan, np.nan, np.nan])
-n2 = np.array([np.nan, np.nan, np.nan])
+n1 = np.array([INV_SQRT2, 0.0, INV_SQRT2])
+n2 = np.array([-INV_SQRT2, 0.0, INV_SQRT2])
 
 # frame derived from the axes (given)
 # take the dot product of the Bloch axis with these
@@ -54,7 +79,28 @@ def n1n2n1_angles(b: Bloch) -> tuple[float, float, float, float]:
     the orthonormal frame defined above. Returns (alpha, beta, gamma, global_phase).
     """
     # TODO(student): implement using the steps above.
-    raise NotImplementedError("n1n2n1_angles is not implemented yet")
+    # raise NotImplementedError("n1n2n1_angles is not implemented yet")
+    # Project Bloch axis into the frame
+    x = np.dot(b.n, a1)
+    y = np.dot(b.n, a2)
+    z = np.dot(b.n, a3)
+    theta = b.theta
+    if np.isclose(theta, 0):
+        return (0.0, 0.0, 0.0, b.alpha)
+    beta = 2 * np.arccos(
+        np.clip(np.sqrt(np.cos(theta / 2)**2 + (x * np.sin(theta / 2))**2), -1.0, 1.0)
+    )
+    s = np.sin(beta / 2)
+    if np.isclose(s, 0):
+        alpha = 0.0
+        gamma = 2 * np.arctan2(x * np.sin(theta / 2),np.cos(theta / 2))
+    else:
+        alpha = np.arctan2(z * np.sin(theta / 2),y * np.sin(theta / 2))
+        gamma = np.arctan2(-z * np.sin(theta / 2),y * np.sin(theta / 2))
+    alpha %= TWO_PI
+    beta %= TWO_PI
+    gamma %= TWO_PI
+    return (alpha, beta, gamma, b.alpha)
 
 
 def approx_angle_with_tolerance(angle: float, tolerance: float) -> int:
@@ -70,7 +116,16 @@ def approx_angle_with_tolerance(angle: float, tolerance: float) -> int:
         min(|a - b|, TWO_PI - |a - b|) (so 0.01 and 2*pi - 0.01 count as close).
     """
     # TODO(student): implement using the hint above.
-    raise NotImplementedError("approx_angle_with_tolerance is not implemented yet")
+    # raise NotImplementedError("approx_angle_with_tolerance is not implemented yet")
+    target = angle % TWO_PI
+    value = 1
+    while True:
+        candidate = (value * LAMBDA_PI) % TWO_PI
+        dist = abs(candidate - target)
+        dist = min(dist, TWO_PI - dist)
+        if dist <= tolerance:
+            return value
+        value += 1
 
 
 def decompose_2x2(u: np.ndarray, tolerance: float) -> tuple[int, int, int]:
@@ -99,5 +154,12 @@ def decompose_2x2(u: np.ndarray, tolerance: float) -> tuple[int, int, int]:
 
       3. Return (k, l, m).
     """
-    # TODO(student): implement using the steps above.
-    raise NotImplementedError("decompose_2x2 is not implemented yet")
+    # # TODO(student): implement using the steps above.
+    # raise NotImplementedError("decompose_2x2 is not implemented yet")
+    newu = to_bloch(u)
+    (alpha, beta, gamma, _globalphase) = n1n2n1_angles(newu)
+    k = approx_angle_with_tolerance(alpha, tolerance)
+    l = approx_angle_with_tolerance(beta, tolerance)
+    m = approx_angle_with_tolerance(gamma, tolerance)
+    return (k,l,m)
+
