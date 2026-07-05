@@ -72,34 +72,34 @@ a3 = np.cross(a1, a2)
 
 
 def n1n2n1_angles(b: Bloch) -> tuple[float, float, float, float]:
-    """Factor the rotation part of a unitary (given as its Bloch form `b`) as
-        u = e^{i global_phase} * Rn1(alpha) * Rn2(beta) * Rn1(gamma)
-
-    where Ra(angle) is a rotation by `angle` about axis a, and {a1, a2, a3} is
-    the orthonormal frame defined above. Returns (alpha, beta, gamma, global_phase).
-    """
-    # TODO(student): implement using the steps above.
-    # raise NotImplementedError("n1n2n1_angles is not implemented yet")
-    # Project Bloch axis into the frame
     x = np.dot(b.n, a1)
     y = np.dot(b.n, a2)
     z = np.dot(b.n, a3)
+
     theta = b.theta
-    if np.isclose(theta, 0):
+
+    if np.isclose(theta, 0.0):
         return (0.0, 0.0, 0.0, b.alpha)
-    beta = 2 * np.arccos(
-        np.clip(np.sqrt(np.cos(theta / 2)**2 + (x * np.sin(theta / 2))**2), -1.0, 1.0)
+
+    phi = theta / 2.0
+    s = np.sin(phi)
+    c = np.cos(phi)
+
+    beta = np.arctan2(
+        np.sqrt((y * s) ** 2 + (z * s) ** 2),
+        np.sqrt(c ** 2 + (x * s) ** 2),
     )
-    s = np.sin(beta / 2)
-    if np.isclose(s, 0):
-        alpha = 0.0
-        gamma = 2 * np.arctan2(x * np.sin(theta / 2),np.cos(theta / 2))
-    else:
-        alpha = np.arctan2(z * np.sin(theta / 2),y * np.sin(theta / 2))
-        gamma = np.arctan2(-z * np.sin(theta / 2),y * np.sin(theta / 2))
+
+    sum = np.arctan2(x * s, c)
+    diff = np.arctan2(z * s, y * s)
+
+    alpha = (sum - diff) / 2.0
+    gamma = (sum + diff) / 2.0
+
     alpha %= TWO_PI
     beta %= TWO_PI
     gamma %= TWO_PI
+
     return (alpha, beta, gamma, b.alpha)
 
 
